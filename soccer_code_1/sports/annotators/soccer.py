@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 import cv2
 import supervision as sv
@@ -305,24 +305,22 @@ def draw_pitch_voronoi_diagram(
 
     return overlay
 
-
 def draw_team_density_heatmap(
     config: SoccerPitchConfiguration,
-    team_1_xy: np.ndarray,
-    team_2_xy: np.ndarray,
-    team_1_color: sv.Color,
-    team_2_color: sv.Color,
+    team_xy: np.ndarray,
+    team_color: sv.Color,
     scale: float = 0.1,
     padding: int = 50,
-    opacity: float = 0.6
+    opacity: float = 0.6,
+    pitch: Optional[np.ndarray] = None
 ) -> np.ndarray:
     width = int(config.length * scale) + 2 * padding
     height = int(config.width * scale) + 2 * padding
 
-    pitch = np.full((height, width, 3), (34, 139, 34), dtype=np.uint8)  # Green background
+    if pitch is None:
+        pitch = np.full((height, width, 3), (34, 139, 34), dtype=np.uint8)  # Green background
 
-    heatmap_1 = np.zeros((height, width), dtype=np.float32)
-    heatmap_2 = np.zeros((height, width), dtype=np.float32)
+    heatmap = np.zeros((height, width), dtype=np.float32)
 
     def accumulate(heatmap, coords):
         for x, y in coords:
@@ -331,16 +329,12 @@ def draw_team_density_heatmap(
             if 0 <= px < width and 0 <= py < height:
                 cv2.circle(heatmap, (px, py), radius=25, color=1, thickness=-1)
 
-    accumulate(heatmap_1, team_1_xy)
-    accumulate(heatmap_2, team_2_xy)
+    accumulate(heatmap, team_xy)
 
-    heatmap_1 = cv2.GaussianBlur(heatmap_1, (55, 55), 0)
-    heatmap_2 = cv2.GaussianBlur(heatmap_2, (55, 55), 0)
+    heatmap = cv2.GaussianBlur(heatmap, (55, 55), 0)
 
-    if np.max(heatmap_1) > 0:
-        heatmap_1 = cv2.normalize(heatmap_1, None, 0, 255, cv2.NORM_MINMAX)
-    if np.max(heatmap_2) > 0:
-        heatmap_2 = cv2.normalize(heatmap_2, None, 0, 255, cv2.NORM_MINMAX)
+    if np.max(heatmap) > 0:
+        heatmap = cv2.normalize(heatmap, None, 0, 255, cv2.NORM_MINMAX)
 
     def colorize(heatmap, base_color: sv.Color):
         base_bgr = np.array(base_color.as_bgr(), dtype=np.uint8)
@@ -349,43 +343,8 @@ def draw_team_density_heatmap(
             colored[:, :, i] = (heatmap * base_bgr[i] / 255).astype(np.uint8)
         return colored
 
-    color_1 = colorize(heatmap_1, team_1_color)
-    color_2 = colorize(heatmap_2, team_2_color)
+    color = colorize(heatmap, team_color)
 
-    combined_heatmap = cv2.add(color_1, color_2)
-    overlay = cv2.addWeighted(pitch, 1 - opacity, combined_heatmap, opacity, 0)
 
+    overlay = cv2.addWeighted(pitch, 1 - opacity, color, opacity, 0)
     return overlay
-
-
-def draw_single_team_heatmap(
-    config: SoccerPitchConfiguration,
-    team_xy: np.ndarray,
-    color: sv.Color,
-    opacity: float = 0.6,
-    padding: int = 50,
-    scale: float = 0.1
-) -> np.ndarray:
-    width = int(config.length * scale) + 2 * padding
-    height = int(config.width * scale) + 2 * padding
-
-    pitch = draw_pitch(config=config, padding=padding, scale=scale)
-
-    heatmap = np.zeros((height, width), dtype=np.float32)
-    for x, y in team_xy:
-        px = int(x * scale) + padding
-        py = int(y * scale) + padding
-        if 0 <= px < width and 0 <= py < height:
-            cv2.circle(heatmap, (px, py), radius=25, color=1, thickness=-1)
-
-    heatmap = cv2.GaussianBlur(heatmap, (55, 55), 0)
-    if np.max(heatmap) > 0:
-        heatmap = cv2.normalize(heatmap, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-        heatmap_color = np.zeros((height, width, 3), dtype=np.uint8)
-        bgr = np.array(color.as_bgr(), dtype=np.uint8)
-        for i in range(3):
-            heatmap_color[:, :, i] = (heatmap * bgr[i] / 255).astype(np.uint8)
-        blended = cv2.addWeighted(pitch, 1 - opacity, heatmap_color, opacity, 0)
-        return blended
-    else:
-        return pitch
