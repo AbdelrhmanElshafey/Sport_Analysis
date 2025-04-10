@@ -2,6 +2,8 @@
 
 A Python-based AI pipeline for in‑depth soccer match analysis. This repo contains two main modules:
 
+> **Note:** This repository includes implementation code only; pre-trained model weights are **not** included. Users must supply or train their own models.
+
 1. **Heatmap & Radar Generation** (`soccer_code_1`)  
 2. **Detection & Analytics** (`soccer_code_2`)  
 
