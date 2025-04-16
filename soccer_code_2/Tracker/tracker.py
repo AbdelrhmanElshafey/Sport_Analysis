@@ -281,9 +281,9 @@ class Tracker:
             for track_id, ball in ball_dict.items():
                 frame = self.draw_triangle(frame, ball["bbox"], (0, 255, 0))
 
-            #for color_tuple, positions in team_positions.items():
-             #   frame = self.draw_convex_hull(frame, positions, color_tuple)
-             #   frame = self.draw_passing_lanes(frame, positions, color_tuple)
+            for color_tuple, positions in team_positions.items():
+               frame = self.draw_convex_hull(frame, positions, color_tuple)
+               frame = self.draw_passing_lanes(frame, positions, color_tuple)
 
 
             frame = self.draw_team_ball_control(frame, frame_num, team_ball_control)

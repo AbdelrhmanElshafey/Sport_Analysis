@@ -460,7 +460,6 @@ def run_radar(source_video_path: str, device: str) -> Iterator[np.ndarray]:
     ball_detection_model = YOLO(BALL_DETECTION_MODEL_PATH).to(device=device)
 
     ball_tracker = BallTracker(buffer_size=20)
-    ball_annotator = BallAnnotator(radius=6, buffer_size=10)
 
     def callback(image_slice: np.ndarray) -> sv.Detections:
         result = ball_detection_model(image_slice, imgsz=640, verbose=False)[0]
