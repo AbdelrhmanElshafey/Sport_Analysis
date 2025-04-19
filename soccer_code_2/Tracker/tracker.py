@@ -5,7 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 import cv2
-import sys
+import sys 
 from scipy.spatial import ConvexHull, distance
 sys.path.append('../')
 from utils import get_center_of_bbox, get_bbox_width, get_foot_position
@@ -151,7 +151,7 @@ class Tracker:
 
         return frame
 
-    def draw_traingle(self,frame,bbox,color):
+    def draw_triangle(self,frame,bbox,color):
         y= int(bbox[1])
         x,_ = get_center_of_bbox(bbox)
 
@@ -184,62 +184,39 @@ class Tracker:
 
         return frame
 
-    def draw_convex_hull(self, frame, players, color):
-        """
-        Draws and fills convex hull for a team with high opacity.
+    def draw_annotations(self,video_frames, tracks,team_ball_control):
+        output_video_frames= []
+        for frame_num, frame in enumerate(video_frames):
+            frame = frame.copy()
 
-        :param frame: The video frame
-        :param players: List of player positions (x, y)
-        :param color: Color for drawing the convex hull
-        """
-        if len(players) < 3:
-            return frame  # Convex Hull needs at least 3 points
+            player_dict = tracks["players"][frame_num]
+            ball_dict = tracks["ball"][frame_num]
+            referee_dict = tracks["referees"][frame_num]
 
-        points = np.array(players)
-        hull = ConvexHull(points)
-        hull_points = points[hull.vertices]
+            # Draw Players
+            for track_id, player in player_dict.items():
+                color = player.get("team_color",(0,0,255))
+                frame = self.draw_ellipse(frame, player["bbox"],color, track_id)
 
-        # Create overlay for transparency
-        overlay = frame.copy()
-        polygon_pts = np.array([hull_points], dtype=np.int32)
+                if player.get('has_ball',False):
+                    frame = self.draw_triangle(frame, player["bbox"],(0,0,255))
 
-        # Convert color to semi-transparent format
-        fill_color = (int(color[0] * 0.5), int(color[1] * 0.5), int(color[2] * 0.5))  # 50% opacity
-        cv2.fillPoly(overlay, polygon_pts, fill_color)
+            # Draw Referee
+            for _, referee in referee_dict.items():
+                frame = self.draw_ellipse(frame, referee["bbox"],(0,255,255))
+            
+            # Draw ball 
+            for track_id, ball in ball_dict.items():
+                frame = self.draw_triangle(frame, ball["bbox"],(0,255,0))
 
-        # Blend with frame
-        frame = cv2.addWeighted(overlay, 0.6, frame, 0.4, 0)
+            # Draw Team Ball Control
+            frame = self.draw_team_ball_control(frame, frame_num, team_ball_control)
 
-        # Draw formation lines
-        for i in range(len(hull_points)):
-            pt1 = tuple(hull_points[i])
-            pt2 = tuple(hull_points[(i + 1) % len(hull_points)])
-            cv2.line(frame, pt1, pt2, color, thickness=3)
+            output_video_frames.append(frame)
 
-        return frame
-
-    def draw_passing_lanes(self, frame, players, color):
-        """
-        Draws dashed lines between close players to visualize passing lanes.
-
-        :param frame: The video frame
-        :param players: List of player positions (x, y)
-        :param color: Line color
-        """
-        if len(players) < 2:
-            return frame
-
-        for i, p1 in enumerate(players):
-            for j, p2 in enumerate(players):
-                if i != j and distance.euclidean(p1, p2) < 150:
-                    for k in range(0, 10, 2):
-                        pt1 = (int(p1[0] + (p2[0] - p1[0]) * k / 10), int(p1[1] + (p2[1] - p1[1]) * k / 10))
-                        pt2 = (int(p1[0] + (p2[0] - p1[0]) * (k + 1) / 10), int(p1[1] + (p2[1] - p1[1]) * (k + 1) / 10))
-                        cv2.line(frame, pt1, pt2, color, thickness=1)
-
-        return frame
-
-    def draw_annotations(self, video_frames, tracks, team_ball_control):
+        return output_video_frames
+    
+    def draw_annotations_convex(self, video_frames, tracks, team_ball_control):
         output_video_frames = []
 
         for frame_num, frame in enumerate(video_frames):
@@ -282,8 +259,8 @@ class Tracker:
                 frame = self.draw_triangle(frame, ball["bbox"], (0, 255, 0))
 
             for color_tuple, positions in team_positions.items():
-               frame = self.draw_convex_hull(frame, positions, color_tuple)
-               frame = self.draw_passing_lanes(frame, positions, color_tuple)
+                frame = self.draw_convex_hull(frame, positions, color_tuple)
+                frame = self.draw_passing_lanes(frame, positions, color_tuple)
 
 
             frame = self.draw_team_ball_control(frame, frame_num, team_ball_control)
@@ -291,45 +268,63 @@ class Tracker:
             output_video_frames.append(frame)
 
         return output_video_frames
-
     
-    def generate_dynamic_team_heatmap(self, video_frames, tracks, output_path):
-            """
-            Generates a heatmap that updates dynamically in each frame to analyze team behavior.
+    def draw_convex_hull(self, frame, players, color):
+        """
+        Draws a filled convex hull directly onto the frame using minimal memory.
 
-            :param video_frames: List of video frames
-            :param tracks: Player tracking data
-            :param output_path: Path to save the output heatmap video
-            """
-            height, width, _ = video_frames[0].shape
+        :param frame: The video frame (numpy array)
+        :param players: List of (x, y) player positions
+        :param color: RGB color tuple
+        """
+        if len(players) < 3:
+            return frame  # Convex hull needs at least 3 points
 
-            # Create video writer
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            fps = 30
-            out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        try:
+            points = np.array(players, dtype=np.int32)
+            hull = ConvexHull(points)
+            hull_points = points[hull.vertices]
+            polygon_pts = np.array([hull_points], dtype=np.int32)
 
-            heatmap_accumulator = np.zeros((height, width), dtype=np.float32)
+            # Create a smaller overlay instead of full frame
+            height, width = frame.shape[:2]
+            mask = np.zeros((height, width, 3), dtype=np.uint8)
 
-            for frame_num, frame in enumerate(video_frames):
-                frame_copy = frame.copy()
-                player_dict = tracks["players"][frame_num]
+            # Fill polygon with color on the mask
+            fill_color = tuple(map(int, color))  # (R, G, B)
+            cv2.fillPoly(mask, polygon_pts, fill_color)
 
-                for _, player in player_dict.items():
-                    pos = get_center_of_bbox(player["bbox"])
-                    x, y = int(pos[0]), int(pos[1])
-                    cv2.circle(heatmap_accumulator, (x, y), 40, 1, -1)  # Adding heat spots
+            # Blend directly with the frame using in-place blending
+            cv2.addWeighted(mask, 0.3, frame, 0.7, 0, dst=frame)
 
-                # Apply Gaussian Blur for smooth heatmap effect
-                heatmap = cv2.GaussianBlur(heatmap_accumulator, (75, 75), 0)
-                heatmap = cv2.normalize(heatmap, None, 0, 255, cv2.NORM_MINMAX)
-                heatmap = np.uint8(heatmap)
-                heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+            # Draw the hull edges
+            for i in range(len(hull_points)):
+                pt1 = tuple(map(int, hull_points[i]))
+                pt2 = tuple(map(int, hull_points[(i + 1) % len(hull_points)]))
+                cv2.line(frame, pt1, pt2, color, thickness=2)
 
-                # Overlay heatmap on frame
-                blended = cv2.addWeighted(frame_copy, 0.6, heatmap, 0.4, 0)
+        except Exception as e:
+            print(f"⚠️ Convex hull error: {e}")
 
-                # Write to video
-                out.write(blended)
+        return frame
 
-            out.release()
-            print(f"Dynamic team heatmap saved at {output_path}")
+    def draw_passing_lanes(self, frame, players, color):
+        """
+        Draws dashed lines between close players to visualize passing lanes.
+
+        :param frame: The video frame
+        :param players: List of player positions (x, y)
+        :param color: Line color
+        """
+        if len(players) < 2:
+            return frame
+
+        for i, p1 in enumerate(players):
+            for j, p2 in enumerate(players):
+                if i != j and distance.euclidean(p1, p2) < 150:
+                    for k in range(0, 10, 2):
+                        pt1 = (int(p1[0] + (p2[0] - p1[0]) * k / 10), int(p1[1] + (p2[1] - p1[1]) * k / 10))
+                        pt2 = (int(p1[0] + (p2[0] - p1[0]) * (k + 1) / 10), int(p1[1] + (p2[1] - p1[1]) * (k + 1) / 10))
+                        cv2.line(frame, pt1, pt2, color, thickness=1)
+
+        return frame

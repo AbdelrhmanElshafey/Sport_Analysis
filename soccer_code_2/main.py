@@ -122,13 +122,14 @@ def main():
         # Move to next chunk starting point
         i += 1
 
-    # Generate Convex Hull Video
-    # convex_hull_video_frames = tracker.draw_convex_hull(video_frames, tracks)
 
     # Save video chunks
     save_video_chunks('input_videos/match_video.mp4', 'video_chunks', chunks)
 
-    # Draw output 
+    # Draw output
+    convex_hull_video_frames = tracker.draw_annotations_convex(video_frames, tracks, team_ball_control)
+    save_video(convex_hull_video_frames, 'output_videos/convex_hull.avi')
+
     ## Draw object Tracks
     output_video_frames = tracker.draw_annotations(video_frames, tracks,team_ball_control)
 
@@ -139,10 +140,6 @@ def main():
     speed_and_distance_estimator.draw_speed_and_distance(output_video_frames,tracks)
 
     save_video(output_video_frames, 'output_videos/test_fine_tuned_yolov8.avi')
-    # save_video(convex_hull_video_frames, 'output_videos/convex_hull.avi')
-    # Generate heatmaps for each team
-    
-    tracker.generate_dynamic_team_heatmap(video_frames, tracks, output_path= 'output_videos/team_heatmaps.avi')
 
 if __name__ == '__main__':
     main()
