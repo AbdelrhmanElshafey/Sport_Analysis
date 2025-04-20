@@ -732,13 +732,10 @@ def run_all_detectors(source_video_path: str, device: str) -> Iterator[Tuple[np.
         goalkeepers_team_id = resolve_goalkeepers_team_id(
             players, players_team_id, goalkeepers)
 
-        referees = players_detections[players_detections.class_id == REFEREE_CLASS_ID]
-
-        players_detections = sv.Detections.merge([players, goalkeepers, referees])
+        players_detections = sv.Detections.merge([players, goalkeepers])
         color_lookup = np.array(
                 players_team_id.tolist() +
-                goalkeepers_team_id.tolist() +
-                [REFEREE_CLASS_ID] * len(referees)
+                goalkeepers_team_id.tolist()
         )
         labels = [str(tracker_id) for tracker_id in players_detections.tracker_id]
 
