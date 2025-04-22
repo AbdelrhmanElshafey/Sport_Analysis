@@ -9,7 +9,7 @@ import supervision as sv
 from tqdm import tqdm
 from ultralytics import YOLO
 
-from sports.annotators.soccer import draw_pitch, draw_points_on_pitch, draw_pitch_voronoi_diagram, draw_team_density_heatmap
+from sports.annotators.soccer import draw_pitch, draw_points_on_pitch, draw_pitch_voronoi_diagram, draw_team_density_heatmap, draw_discrete_density_heatmap2
 from sports.common.ball import BallTracker, BallAnnotator
 from sports.common.team import TeamClassifier
 from sports.common.view import ViewTransformer
@@ -246,7 +246,7 @@ def render_heatmap(
             pitch=heatmap)
         team_color = sv.Color.from_hex(COLORS[0])
         # Draw radar with cumulative heatmap
-        heatmap = draw_team_density_heatmap(
+        heatmap = draw_discrete_density_heatmap2(
             config=CONFIG,
             team_xy=np.array(team_heatmap_buffer),
             team_color=team_color,
@@ -267,7 +267,7 @@ def render_heatmap(
             pitch=heatmap)
         team_color = sv.Color.from_hex(COLORS[1])
         # Draw radar with cumulative heatmap
-        heatmap = draw_team_density_heatmap(
+        heatmap = draw_discrete_density_heatmap2(
             config=CONFIG,
             team_xy=np.array(team_heatmap_buffer),
             team_color=team_color,

@@ -308,7 +308,7 @@ def draw_pitch_voronoi_diagram(
 def draw_team_density_heatmap(
     config: SoccerPitchConfiguration,
     team_xy: np.ndarray,
-    team_color: sv.Color,  # can be ignored in manual mode
+    team_color: sv.Color,
     scale: float = 0.1,
     padding: int = 50,
     opacity: float = 0.6,
@@ -322,39 +322,77 @@ def draw_team_density_heatmap(
 
     heatmap = np.zeros((height, width), dtype=np.float32)
 
+    def accumulate(heatmap, coords):
+        for x, y in coords:
+            px = int(x * scale) + padding
+            py = int(y * scale) + padding
+            if 0 <= px < width and 0 <= py < height:
+                cv2.circle(heatmap, (px, py), radius=25, color=1, thickness=-1)
+
+    accumulate(heatmap, team_xy)
+
+    heatmap = cv2.GaussianBlur(heatmap, (55, 55), 0)
+
+    if np.max(heatmap) > 0:
+        heatmap = cv2.normalize(heatmap, None, 0, 255, cv2.NORM_MINMAX)
+
+    def colorize(heatmap, base_color: sv.Color):
+        base_bgr = np.array(base_color.as_bgr(), dtype=np.uint8)
+        colored = np.zeros((height, width, 3), dtype=np.uint8)
+        for i in range(3):
+            colored[:, :, i] = (heatmap * base_bgr[i] / 255).astype(np.uint8)
+        return colored
+
+    color = colorize(heatmap, team_color)
+
+
+    overlay = cv2.addWeighted(pitch, 1 - opacity, color, opacity, 0)
+    return overlay
+
+def draw_discrete_density_heatmap2(
+    config: SoccerPitchConfiguration,
+    team_xy: np.ndarray,
+    scale: float = 0.1,
+    padding: int = 50,
+    opacity: float = 0.5,
+    pitch: Optional[np.ndarray] = None
+) -> np.ndarray:
+    width = int(config.length * scale) + 2 * padding
+    height = int(config.width * scale) + 2 * padding
+
+    if pitch is None:
+        pitch = draw_pitch(config=config, scale=scale, padding=padding)
+
+    # Initialize a counter map
+    heat_counter = np.zeros((height, width), dtype=np.uint16)
+
+    # Increase count at each coordinate
     for x, y in team_xy:
         px = int(x * scale) + padding
         py = int(y * scale) + padding
         if 0 <= px < width and 0 <= py < height:
-            cv2.circle(heatmap, (px, py), radius=25, color=1, thickness=-1)
+            heat_counter[py, px] += 1
 
-    heatmap = cv2.GaussianBlur(heatmap, (55, 55), 0)
+    # Spread count to neighborhood (simple blur kernel)
+    heat_counter = cv2.GaussianBlur(heat_counter.astype(np.float32), (55, 55), 0)
 
-    if np.max(heatmap) == 0:
-        return pitch  # nothing to show
-
-    heatmap = cv2.normalize(heatmap, None, 0, 1.0, cv2.NORM_MINMAX)
-
-    # Prepare custom color map (yellow -> red -> dark red)
     overlay = pitch.copy()
     for y in range(height):
         for x in range(width):
-            value = heatmap[y, x]
-            if value > 0:
-                # interpolate yellow → red → dark red
-                if value < 0.5:
-                    # Yellow (255,255,0) to Red (255,0,0)
-                    r = 255
-                    g = int(255 * (1 - value * 2))
-                    b = 0
-                else:
-                    # Red (255,0,0) to Dark Red (100,0,0)
-                    r = int(255 - (value - 0.5) * 2 * 155)
-                    g = 0
-                    b = 0
+            count = heat_counter[y, x]
+            if count >= 200:
+                color = (0, 0, 139)     # Dark red (BGR)
+            elif count >= 100:
+                color = (0, 0, 255)     # Red
+            elif count > 0:
+                color = (0, 255, 255)   # Yellow
+            else:
+                continue
 
-                # Blend with pitch
-                orig = overlay[y, x]
-                overlay[y, x] = (1 - opacity) * orig + opacity * np.array([b, g, r], dtype=np.uint8)
+            # Blend with pitch
+            overlay[y, x] = (
+                (1 - opacity) * overlay[y, x] + opacity * np.array(color)
+            ).astype(np.uint8)
 
     return overlay
+
