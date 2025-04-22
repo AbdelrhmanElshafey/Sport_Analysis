@@ -308,7 +308,7 @@ def draw_pitch_voronoi_diagram(
 def draw_team_density_heatmap(
     config: SoccerPitchConfiguration,
     team_xy: np.ndarray,
-    team_color: sv.Color,
+    team_color: sv.Color,  # can be ignored in manual mode
     scale: float = 0.1,
     padding: int = 50,
     opacity: float = 0.6,
@@ -322,29 +322,39 @@ def draw_team_density_heatmap(
 
     heatmap = np.zeros((height, width), dtype=np.float32)
 
-    def accumulate(heatmap, coords):
-        for x, y in coords:
-            px = int(x * scale) + padding
-            py = int(y * scale) + padding
-            if 0 <= px < width and 0 <= py < height:
-                cv2.circle(heatmap, (px, py), radius=25, color=1, thickness=-1)
-
-    accumulate(heatmap, team_xy)
+    for x, y in team_xy:
+        px = int(x * scale) + padding
+        py = int(y * scale) + padding
+        if 0 <= px < width and 0 <= py < height:
+            cv2.circle(heatmap, (px, py), radius=25, color=1, thickness=-1)
 
     heatmap = cv2.GaussianBlur(heatmap, (55, 55), 0)
 
-    if np.max(heatmap) > 0:
-        heatmap = cv2.normalize(heatmap, None, 0, 255, cv2.NORM_MINMAX)
+    if np.max(heatmap) == 0:
+        return pitch  # nothing to show
 
-    def colorize(heatmap, base_color: sv.Color):
-        base_bgr = np.array(base_color.as_bgr(), dtype=np.uint8)
-        colored = np.zeros((height, width, 3), dtype=np.uint8)
-        for i in range(3):
-            colored[:, :, i] = (heatmap * base_bgr[i] / 255).astype(np.uint8)
-        return colored
+    heatmap = cv2.normalize(heatmap, None, 0, 1.0, cv2.NORM_MINMAX)
 
-    color = colorize(heatmap, team_color)
+    # Prepare custom color map (yellow -> red -> dark red)
+    overlay = pitch.copy()
+    for y in range(height):
+        for x in range(width):
+            value = heatmap[y, x]
+            if value > 0:
+                # interpolate yellow → red → dark red
+                if value < 0.5:
+                    # Yellow (255,255,0) to Red (255,0,0)
+                    r = 255
+                    g = int(255 * (1 - value * 2))
+                    b = 0
+                else:
+                    # Red (255,0,0) to Dark Red (100,0,0)
+                    r = int(255 - (value - 0.5) * 2 * 155)
+                    g = 0
+                    b = 0
 
+                # Blend with pitch
+                orig = overlay[y, x]
+                overlay[y, x] = (1 - opacity) * orig + opacity * np.array([b, g, r], dtype=np.uint8)
 
-    overlay = cv2.addWeighted(pitch, 1 - opacity, color, opacity, 0)
     return overlay
