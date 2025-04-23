@@ -248,7 +248,7 @@ def render_heatmap(
         # Draw radar with cumulative heatmap
         heatmap = draw_percentage_based_heatmap(
             config=CONFIG,
-            team_xy=np.array(team_heatmap_buffer),
+            team_frames_xy=np.array(team_heatmap_buffer),
             team_color=team_color,
             opacity=0.6,
             pitch=heatmap
@@ -269,7 +269,7 @@ def render_heatmap(
         # Draw radar with cumulative heatmap
         heatmap = draw_percentage_based_heatmap(
             config=CONFIG,
-            team_xy=np.array(team_heatmap_buffer),
+            team_frames_xy=np.array(team_heatmap_buffer),
             team_color=team_color,
             opacity=0.6,
             pitch=heatmap
