@@ -319,11 +319,12 @@ def draw_percentage_based_heatmap(
     if pitch is None:
         pitch = draw_pitch(config=config, scale=scale, padding=padding)
 
-    #total_frames = len(team_frames_xy)
-    total_frames = 750
+    total_frames = len(team_frames_xy)
     counter_map = np.zeros((height, width), dtype=np.uint16)
 
     for frame_xy in team_frames_xy:
+        if frame_xy.ndim == 1:
+            frame_xy = frame_xy.reshape(-1, 2)
         for x, y in frame_xy:
             px = int(x * scale) + padding
             py = int(y * scale) + padding
@@ -352,4 +353,5 @@ def draw_percentage_based_heatmap(
             ).astype(np.uint8)
 
     return overlay
+
 
