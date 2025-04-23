@@ -307,51 +307,56 @@ def draw_pitch_voronoi_diagram(
 
 def draw_percentage_based_heatmap(
     config: SoccerPitchConfiguration,
-    team_frames_xy: List[np.ndarray],  # all player positions per frame
+    team_frames_xy: List[np.ndarray],  # list of player (x,y) coords per frame
+    grid_size: int = 50,  # cm
     scale: float = 0.1,
     padding: int = 50,
-    pitch: Optional[np.ndarray] = None,
-    opacity: float = 0.5
+    opacity: float = 0.6
 ) -> np.ndarray:
-    width = int(config.length * scale) + 2 * padding
-    height = int(config.width * scale) + 2 * padding
+    pitch_width = int(config.length * scale) + 2 * padding
+    pitch_height = int(config.width * scale) + 2 * padding
 
-    if pitch is None:
-        pitch = draw_pitch(config=config, scale=scale, padding=padding)
+    cell_x = int(config.length // grid_size)
+    cell_y = int(config.width // grid_size)
 
+    heatmap_counts = np.zeros((cell_y, cell_x), dtype=np.int32)
     total_frames = len(team_frames_xy)
-    counter_map = np.zeros((height, width), dtype=np.uint16)
 
     for frame_xy in team_frames_xy:
-        if frame_xy.ndim == 1:
-            frame_xy = frame_xy.reshape(-1, 2)
+        used = set()
         for x, y in frame_xy:
-            px = int(x * scale) + padding
-            py = int(y * scale) + padding
-            if 0 <= px < width and 0 <= py < height:
-                counter_map[py, px] += 1
+            i = int(y // grid_size)
+            j = int(x // grid_size)
+            if 0 <= i < cell_y and 0 <= j < cell_x:
+                used.add((i, j))  # avoid overcounting within the same frame
+        for i, j in used:
+            heatmap_counts[i, j] += 1
 
-    # Convert count to percentage presence
-    percent_map = (counter_map.astype(np.float32) / total_frames) * 100.0
-    percent_map = cv2.GaussianBlur(percent_map, (55, 55), 0)
+    usage_map = heatmap_counts / total_frames
 
+    pitch = draw_pitch(config=config, scale=scale, padding=padding)
     overlay = pitch.copy()
-    for y in range(height):
-        for x in range(width):
-            percent = percent_map[y, x]
-            if percent >= 90:
-                color = (0, 0, 139)  # Very dark red
-            elif percent >= 50:
+
+    for i in range(cell_y):
+        for j in range(cell_x):
+            usage = usage_map[i, j]
+            if usage == 0:
+                continue
+
+            x_px = int(j * grid_size * scale) + padding
+            y_px = int(i * grid_size * scale) + padding
+
+            if usage > 0.8:
+                color = (0, 0, 100)  # Dark red
+            elif usage > 0.5:
                 color = (0, 0, 255)  # Red
-            elif percent > 0:
-                color = (0, 255, 255)  # Yellow
+            elif usage > 0.2:
+                color = (0, 165, 255)  # Orange
             else:
-                continue  # No player presence
+                color = (0, 255, 255)  # Yellow
 
-            overlay[y, x] = (
-                (1 - opacity) * overlay[y, x] + opacity * np.array(color)
-            ).astype(np.uint8)
+            cv2.circle(overlay, (x_px, y_px), radius=15, color=color, thickness=-1)
 
-    return overlay
+    return cv2.addWeighted(pitch, 1 - opacity, overlay, opacity, 0)
 
 
