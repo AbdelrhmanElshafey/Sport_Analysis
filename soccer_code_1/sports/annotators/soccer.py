@@ -307,11 +307,12 @@ def draw_pitch_voronoi_diagram(
 
 def draw_percentage_based_heatmap(
     config: SoccerPitchConfiguration,
-    team_frames_xy: List[np.ndarray],  # list of player (x,y) coords per frame
-    grid_size: int = 50,  # cm
+    team_frames_xy: List[np.ndarray],
+    grid_size: int = 50,
     scale: float = 0.1,
     padding: int = 50,
-    opacity: float = 0.6
+    opacity: float = 0.6,
+    pitch: Optional[np.ndarray] = None  # ✅ Add this
 ) -> np.ndarray:
     pitch_width = int(config.length * scale) + 2 * padding
     pitch_height = int(config.width * scale) + 2 * padding
