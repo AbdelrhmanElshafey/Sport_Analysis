@@ -319,7 +319,8 @@ def draw_percentage_based_heatmap(
     if pitch is None:
         pitch = draw_pitch(config=config, scale=scale, padding=padding)
 
-    total_frames = len(team_frames_xy)
+    #total_frames = len(team_frames_xy)
+    total_frames = 750
     counter_map = np.zeros((height, width), dtype=np.uint16)
 
     for frame_xy in team_frames_xy:
