@@ -305,57 +305,13 @@ def draw_pitch_voronoi_diagram(
 
     return overlay
 
-def draw_team_density_heatmap(
+def draw_percentage_based_heatmap(
     config: SoccerPitchConfiguration,
-    team_xy: np.ndarray,
-    team_color: sv.Color,
+    team_frames_xy: List[np.ndarray],  # all player positions per frame
     scale: float = 0.1,
     padding: int = 50,
-    opacity: float = 0.6,
-    pitch: Optional[np.ndarray] = None
-) -> np.ndarray:
-    width = int(config.length * scale) + 2 * padding
-    height = int(config.width * scale) + 2 * padding
-
-    if pitch is None:
-        pitch = np.full((height, width, 3), (34, 139, 34), dtype=np.uint8)  # Green background
-
-    heatmap = np.zeros((height, width), dtype=np.float32)
-
-    def accumulate(heatmap, coords):
-        for x, y in coords:
-            px = int(x * scale) + padding
-            py = int(y * scale) + padding
-            if 0 <= px < width and 0 <= py < height:
-                cv2.circle(heatmap, (px, py), radius=25, color=1, thickness=-1)
-
-    accumulate(heatmap, team_xy)
-
-    heatmap = cv2.GaussianBlur(heatmap, (55, 55), 0)
-
-    if np.max(heatmap) > 0:
-        heatmap = cv2.normalize(heatmap, None, 0, 255, cv2.NORM_MINMAX)
-
-    def colorize(heatmap, base_color: sv.Color):
-        base_bgr = np.array(base_color.as_bgr(), dtype=np.uint8)
-        colored = np.zeros((height, width, 3), dtype=np.uint8)
-        for i in range(3):
-            colored[:, :, i] = (heatmap * base_bgr[i] / 255).astype(np.uint8)
-        return colored
-
-    color = colorize(heatmap, team_color)
-
-
-    overlay = cv2.addWeighted(pitch, 1 - opacity, color, opacity, 0)
-    return overlay
-
-def draw_discrete_density_heatmap2(
-    config: SoccerPitchConfiguration,
-    team_xy: np.ndarray,
-    scale: float = 0.1,
-    padding: int = 50,
-    opacity: float = 0.5,
-    pitch: Optional[np.ndarray] = None
+    pitch: Optional[np.ndarray] = None,
+    opacity: float = 0.5
 ) -> np.ndarray:
     width = int(config.length * scale) + 2 * padding
     height = int(config.width * scale) + 2 * padding
@@ -363,33 +319,33 @@ def draw_discrete_density_heatmap2(
     if pitch is None:
         pitch = draw_pitch(config=config, scale=scale, padding=padding)
 
-    # Initialize a counter map
-    heat_counter = np.zeros((height, width), dtype=np.uint16)
+    total_frames = len(team_frames_xy)
+    counter_map = np.zeros((height, width), dtype=np.uint16)
 
-    # Increase count at each coordinate
-    for x, y in team_xy:
-        px = int(x * scale) + padding
-        py = int(y * scale) + padding
-        if 0 <= px < width and 0 <= py < height:
-            heat_counter[py, px] += 1
+    for frame_xy in team_frames_xy:
+        for x, y in frame_xy:
+            px = int(x * scale) + padding
+            py = int(y * scale) + padding
+            if 0 <= px < width and 0 <= py < height:
+                counter_map[py, px] += 1
 
-    # Spread count to neighborhood (simple blur kernel)
-    heat_counter = cv2.GaussianBlur(heat_counter.astype(np.float32), (55, 55), 0)
+    # Convert count to percentage presence
+    percent_map = (counter_map.astype(np.float32) / total_frames) * 100.0
+    percent_map = cv2.GaussianBlur(percent_map, (55, 55), 0)
 
     overlay = pitch.copy()
     for y in range(height):
         for x in range(width):
-            count = heat_counter[y, x]
-            if count >= 200:
-                color = (0, 0, 139)     # Dark red (BGR)
-            elif count >= 100:
-                color = (0, 0, 255)     # Red
-            elif count > 0:
-                color = (0, 255, 255)   # Yellow
+            percent = percent_map[y, x]
+            if percent >= 90:
+                color = (0, 0, 139)  # Very dark red
+            elif percent >= 50:
+                color = (0, 0, 255)  # Red
+            elif percent > 0:
+                color = (0, 255, 255)  # Yellow
             else:
-                continue
+                continue  # No player presence
 
-            # Blend with pitch
             overlay[y, x] = (
                 (1 - opacity) * overlay[y, x] + opacity * np.array(color)
             ).astype(np.uint8)
