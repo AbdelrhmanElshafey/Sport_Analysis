@@ -256,7 +256,7 @@ def render_heatmap(
     else:
         team_1_xy = transformed_xy[color_lookup == 1]
         # Accumulate positions into global buffer
-        team_heatmap_buffer.append(np.array(team_0_xy))
+        team_heatmap_buffer.append(np.array(team_1_xy))
         # Draw player positions
         heatmap = draw_points_on_pitch(
             config=CONFIG,
