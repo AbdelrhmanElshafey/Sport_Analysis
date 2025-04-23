@@ -307,12 +307,12 @@ def draw_pitch_voronoi_diagram(
 
 def draw_percentage_based_heatmap(
     config: SoccerPitchConfiguration,
-    team_frames_xy: List[np.ndarray],
-    grid_size: int = 50,
+    team_frames_xy: List[np.ndarray],  # list of player (x,y) coords per frame
+    grid_size: int = 50,  # cm
     scale: float = 0.1,
     padding: int = 50,
     opacity: float = 0.6,
-    pitch: Optional[np.ndarray] = None  # ✅ Add this
+    pitch: Optional[np.ndarray] = None  # Optional pitch input
 ) -> np.ndarray:
     pitch_width = int(config.length * scale) + 2 * padding
     pitch_height = int(config.width * scale) + 2 * padding
@@ -323,19 +323,18 @@ def draw_percentage_based_heatmap(
     heatmap_counts = np.zeros((cell_y, cell_x), dtype=np.int32)
     total_frames = len(team_frames_xy)
 
+    # Accumulate every player's position per frame (overlap counts multiple times)
     for frame_xy in team_frames_xy:
-        used = set()
         for x, y in frame_xy:
             i = int(y // grid_size)
             j = int(x // grid_size)
             if 0 <= i < cell_y and 0 <= j < cell_x:
-                used.add((i, j))  # avoid overcounting within the same frame
-        for i, j in used:
-            heatmap_counts[i, j] += 1
+                heatmap_counts[i, j] += 1
 
     usage_map = heatmap_counts / total_frames
 
-    pitch = draw_pitch(config=config, scale=scale, padding=padding)
+    if pitch is None:
+        pitch = draw_pitch(config=config, scale=scale, padding=padding)
     overlay = pitch.copy()
 
     for i in range(cell_y):
@@ -359,5 +358,6 @@ def draw_percentage_based_heatmap(
             cv2.circle(overlay, (x_px, y_px), radius=15, color=color, thickness=-1)
 
     return cv2.addWeighted(pitch, 1 - opacity, overlay, opacity, 0)
+
 
 
