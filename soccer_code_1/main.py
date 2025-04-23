@@ -249,7 +249,7 @@ def render_heatmap(
         heatmap = draw_percentage_based_heatmap(
             config=CONFIG,
             team_frames_xy=np.array(team_heatmap_buffer),
-            team_color=team_color,
+            #team_color=team_color,
             opacity=0.6,
             pitch=heatmap
         )
@@ -270,7 +270,7 @@ def render_heatmap(
         heatmap = draw_percentage_based_heatmap(
             config=CONFIG,
             team_frames_xy=np.array(team_heatmap_buffer),
-            team_color=team_color,
+            #team_color=team_color,
             opacity=0.6,
             pitch=heatmap
         )
