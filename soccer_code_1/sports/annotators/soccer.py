@@ -348,11 +348,11 @@ def draw_percentage_based_heatmap(
             x_px = int(j * grid_size * scale) + padding
             y_px = int(i * grid_size * scale) + padding
 
-            if usage > 0.8:
+            if usage > 0.20:
                 color = (0, 0, 100)  # Dark red
-            elif usage > 0.5:
+            elif usage > 0.15:
                 color = (0, 0, 255)  # Red
-            elif usage > 0.2:
+            elif usage > 0.10:
                 color = (0, 165, 255)  # Orange
             else:
                 color = (0, 255, 255)  # Yellow
