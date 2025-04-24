@@ -350,7 +350,7 @@ def draw_percentage_based_heatmap(
 
             if usage > 0.50:
                 color = (0, 0, 100)  # Dark red
-            elif usage > 0.20:
+            elif usage > 0.30:
                 color = (0, 0, 255)  # Red
             elif usage > 0.15:
                 color = (0, 165, 255)  # Orange
