@@ -308,7 +308,7 @@ def draw_pitch_voronoi_diagram(
 def draw_percentage_based_heatmap(
     config: SoccerPitchConfiguration,
     team_frames_xy: List[np.ndarray],
-    grid_size: int = 50,  # cm — recommended
+    grid_size: int = 1,  # cm — recommended
     scale: float = 0.1,
     padding: int = 50,
     opacity: float = 0.6,
