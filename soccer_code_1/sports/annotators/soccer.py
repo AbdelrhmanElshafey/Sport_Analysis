@@ -307,12 +307,12 @@ def draw_pitch_voronoi_diagram(
 
 def draw_percentage_based_heatmap(
     config: SoccerPitchConfiguration,
-    team_frames_xy: List[np.ndarray],  # list of player (x,y) coords per frame
-    grid_size: int = 1,  # cm
+    team_frames_xy: List[np.ndarray],
+    grid_size: int = 50,  # cm — recommended
     scale: float = 0.1,
     padding: int = 50,
     opacity: float = 0.6,
-    pitch: Optional[np.ndarray] = None  # Optional pitch input
+    pitch: Optional[np.ndarray] = None
 ) -> np.ndarray:
     pitch_width = int(config.length * scale) + 2 * padding
     pitch_height = int(config.width * scale) + 2 * padding
@@ -321,9 +321,7 @@ def draw_percentage_based_heatmap(
     cell_y = int(config.width // grid_size)
 
     heatmap_counts = np.zeros((cell_y, cell_x), dtype=np.int32)
-    total_frames = len(team_frames_xy)
 
-    # Accumulate every player's position per frame (overlap counts multiple times)
     for frame_xy in team_frames_xy:
         for x, y in frame_xy:
             i = int(y // grid_size)
@@ -331,7 +329,11 @@ def draw_percentage_based_heatmap(
             if 0 <= i < cell_y and 0 <= j < cell_x:
                 heatmap_counts[i, j] += 1
 
-    usage_map = heatmap_counts / total_frames
+    max_count = np.max(heatmap_counts)
+    if max_count == 0:
+        return draw_pitch(config=config, scale=scale, padding=padding)
+
+    usage_map = heatmap_counts / max_count
 
     if pitch is None:
         pitch = draw_pitch(config=config, scale=scale, padding=padding)
@@ -346,11 +348,11 @@ def draw_percentage_based_heatmap(
             x_px = int(j * grid_size * scale) + padding
             y_px = int(i * grid_size * scale) + padding
 
-            if usage > 0.2:
+            if usage > 0.8:
                 color = (0, 0, 100)  # Dark red
-            elif usage > 0.15:
+            elif usage > 0.5:
                 color = (0, 0, 255)  # Red
-            elif usage > 0.1:
+            elif usage > 0.2:
                 color = (0, 165, 255)  # Orange
             else:
                 color = (0, 255, 255)  # Yellow
